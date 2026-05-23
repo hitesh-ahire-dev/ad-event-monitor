@@ -40,6 +40,20 @@ app:
     cache-ttl-seconds: 60
     cache-max-size: 50000
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ad-event-monitor
+
 springdoc:
   swagger-ui:
     path: /swagger-ui/index.html

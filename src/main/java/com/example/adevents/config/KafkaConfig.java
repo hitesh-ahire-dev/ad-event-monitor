@@ -2,6 +2,7 @@ package com.example.adevents.config;
 
 import com.example.adevents.model.AdEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -13,6 +14,7 @@ import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.MicrometerConsumerListener;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
@@ -36,9 +38,11 @@ import java.util.Map;
 public class KafkaConfig {
 
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
-    public KafkaConfig(ObjectMapper objectMapper) {
+    public KafkaConfig(ObjectMapper objectMapper, MeterRegistry meterRegistry) {
         this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry;
     }
 
     @Value("${spring.kafka.bootstrap-servers}")
@@ -86,7 +90,12 @@ public class KafkaConfig {
         ErrorHandlingDeserializer<AdEvent> valueDeserializer =
                 new ErrorHandlingDeserializer<>(jsonValueDeserializer);
 
-        return new DefaultKafkaConsumerFactory<>(props, keyDeserializer, valueDeserializer);
+        DefaultKafkaConsumerFactory<String, AdEvent> factory =
+                new DefaultKafkaConsumerFactory<>(props, keyDeserializer, valueDeserializer);
+        // Exposes Kafka client metrics (records-lag-max, records-consumed-rate, …)
+        // via Micrometer so they show up on /actuator/prometheus.
+        factory.addListener(new MicrometerConsumerListener<>(meterRegistry));
+        return factory;
     }
 
     @Bean

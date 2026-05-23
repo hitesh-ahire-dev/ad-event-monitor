@@ -6,6 +6,7 @@ import com.example.adevents.model.StaticEnrichment;
 import com.example.adevents.service.DynamicEnrichmentService;
 import com.example.adevents.service.EventPersistenceService;
 import com.example.adevents.service.StaticEnrichmentService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -29,7 +30,8 @@ class AdEventConsumerTest {
         staticSvc = mock(StaticEnrichmentService.class);
         dynamicSvc = mock(DynamicEnrichmentService.class);
         persistence = mock(EventPersistenceService.class);
-        consumer = new AdEventConsumer(staticSvc, dynamicSvc, persistence, Runnable::run);
+        consumer = new AdEventConsumer(staticSvc, dynamicSvc, persistence,
+                Runnable::run, new SimpleMeterRegistry());
     }
 
     private AdEvent sample() {

@@ -1,0 +1,39 @@
+groups:
+  - name: ad-event-monitor.rules
+    interval: 30s
+    rules:
+
+      - alert: HighKafkaLag
+        expr: max(kafka_consumer_fetch_manager_records_lag_max{application="ad-event-monitor"}) > 5000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka consumer lag is high"
+          description: "Consumer lag has been > 5000 for 2 minutes (current={{ $value }})."
+
+      - alert: HighEventFailureRate
+        expr: |
+          (sum(rate(ad_events_processed_total{application="ad-event-monitor", result="failure"}[5m])))
+          /
+          (sum(rate(ad_events_processed_total{application="ad-event-monitor"}[5m])) > 0)
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5% of AD events failing"
+          description: "Failure ratio over the last 5m is {{ $value | humanizePercentage }}."
+
+      - alert: HighEnrichmentFailureRate
+        expr: |
+          sum by (type) (rate(ad_enrichment_total{application="ad-event-monitor", result="failure"}[5m]))
+          /
+          sum by (type) (rate(ad_enrichment_total{application="ad-event-monitor"}[5m]) > 0)
+          > 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Enrichment ({{ $labels.type }}) failure rate > 10%"
+          description: "{{ $labels.type }} enrichment failure ratio is {{ $value | humanizePercentage }}."

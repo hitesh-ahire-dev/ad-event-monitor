@@ -6,6 +6,8 @@ import com.example.adevents.model.StaticEnrichment;
 import com.example.adevents.service.DynamicEnrichmentService;
 import com.example.adevents.service.EventPersistenceService;
 import com.example.adevents.service.StaticEnrichmentService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -33,15 +35,23 @@ public class AdEventConsumer {
     private final DynamicEnrichmentService dynamicService;
     private final EventPersistenceService persistence;
     private final Executor enrichmentExecutor;
+    private final MeterRegistry meters;
+    private final Timer processingTimer;
 
     public AdEventConsumer(StaticEnrichmentService staticService,
                            DynamicEnrichmentService dynamicService,
                            EventPersistenceService persistence,
-                           @Qualifier("enrichmentExecutor") Executor enrichmentExecutor) {
+                           @Qualifier("enrichmentExecutor") Executor enrichmentExecutor,
+                           MeterRegistry meters) {
         this.staticService = staticService;
         this.dynamicService = dynamicService;
         this.persistence = persistence;
         this.enrichmentExecutor = enrichmentExecutor;
+        this.meters = meters;
+        this.processingTimer = Timer.builder("ad_events_processing_latency")
+                .description("End-to-end processing latency per AD event")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(meters);
     }
 
     @KafkaListener(
@@ -50,46 +60,74 @@ public class AdEventConsumer {
     public void onMessage(AdEvent event) {
         if (event == null || event.getEventId() == null) {
             log.warn("Skipping null / id-less event: {}", event);
+            meters.counter("ad_events_processed_total", "result", "skipped").increment();
             return;
         }
 
         String eventId = event.getEventId();
+        Timer.Sample sample = Timer.start(meters);
 
         CompletableFuture<StaticEnrichment> sf = CompletableFuture
-                .supplyAsync(() -> staticService.getByEventId(eventId), enrichmentExecutor)
+                .supplyAsync(() -> meters
+                        .timer("ad_enrichment_latency_seconds", "type", "static")
+                        .record(() -> staticService.getByEventId(eventId)),
+                        enrichmentExecutor)
                 .exceptionally(ex -> {
                     log.error("Static enrichment failed for eventId={}: {}", eventId, ex.getMessage());
+                    meters.counter("ad_enrichment_total", "type", "static", "result", "failure").increment();
+                    meters.counter("ad_events_exceptions_total", "stage", "static_enrichment").increment();
                     return null;
                 });
 
         CompletableFuture<DynamicEnrichment> df = CompletableFuture
-                .supplyAsync(() -> dynamicService.getByEventId(eventId), enrichmentExecutor)
+                .supplyAsync(() -> meters
+                        .timer("ad_enrichment_latency_seconds", "type", "dynamic")
+                        .record(() -> dynamicService.getByEventId(eventId)),
+                        enrichmentExecutor)
                 .exceptionally(ex -> {
                     log.error("Dynamic enrichment failed for eventId={}: {}", eventId, ex.getMessage());
+                    meters.counter("ad_enrichment_total", "type", "dynamic", "result", "failure").increment();
+                    meters.counter("ad_events_exceptions_total", "stage", "dynamic_enrichment").increment();
                     return null;
                 });
 
         StaticEnrichment se = sf.join();
         DynamicEnrichment de = df.join();
 
+        meters.counter("ad_enrichment_total", "type", "static",
+                "result", se != null ? "success" : "failure").increment();
+        meters.counter("ad_enrichment_total", "type", "dynamic",
+                "result", de != null ? "success" : "failure").increment();
+
         log.info("Processed enrichments eventId={} static={} dynamic={}",
                 eventId, se != null, de != null);
 
+        boolean persisted = true;
         try {
             persistence.saveBoth(event, se, de);
         } catch (Exception bothFailed) {
             log.error("Atomic save failed for eventId={}, falling back to independent saves: {}",
                     eventId, bothFailed.getMessage());
+            meters.counter("ad_events_exceptions_total", "stage", "persist_atomic").increment();
+            persisted = false;
             try {
                 persistence.saveStatic(event, se);
+                persisted = true;
             } catch (Exception e) {
                 log.error("Static save failed for eventId={}: {}", eventId, e.getMessage());
+                meters.counter("ad_events_exceptions_total", "stage", "persist_static").increment();
             }
             try {
                 persistence.saveDynamic(event, de);
+                persisted = true;
             } catch (Exception e) {
                 log.error("Dynamic save failed for eventId={}: {}", eventId, e.getMessage());
+                meters.counter("ad_events_exceptions_total", "stage", "persist_dynamic").increment();
             }
         }
+
+        meters.counter("ad_events_processed_total",
+                "result", persisted ? "success" : "failure").increment();
+        sample.stop(processingTimer);
     }
 }
