@@ -1,0 +1,14 @@
+{
+  "EVT-1001": {
+    "riskScore": 72,
+    "sessionActive": true,
+    "policyViolation": false,
+    "lastSeenMinutesAgo": 5
+  },
+  "EVT-1002": {
+    "riskScore": 15,
+    "sessionActive": false,
+    "policyViolation": false,
+    "lastSeenMinutesAgo": 240
+  }
+}

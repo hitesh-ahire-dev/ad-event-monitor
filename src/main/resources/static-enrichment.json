@@ -1,0 +1,14 @@
+{
+  "EVT-1001": {
+    "department": "Engineering",
+    "role": "Developer",
+    "site": "Mumbai",
+    "managerEmail": "manager@corp.com"
+  },
+  "EVT-1002": {
+    "department": "Finance",
+    "role": "Analyst",
+    "site": "Bengaluru",
+    "managerEmail": "fin-mgr@corp.com"
+  }
+}

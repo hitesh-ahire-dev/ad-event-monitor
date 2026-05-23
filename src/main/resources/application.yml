@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: ad-event-monitor
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/todo_app?createDatabaseIfNotExist=true&serverTimezone=UTC
+    username: root
+    password: root1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        dialect: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: ad-event-monitor
+      auto-offset-reset: earliest
+
+app:
+  kafka:
+    topic: ad-events
+  static-enrichment:
+    location: classpath:static-enrichment.json
+    refresh-ms: 1800000          # 30 min
+  dynamic-enrichment:
+    location: classpath:dynamic-enrichment.json
+    cache-ttl-seconds: 60
+    cache-max-size: 50000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui/index.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    com.example.adevents: INFO
