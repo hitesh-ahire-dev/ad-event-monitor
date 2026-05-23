@@ -96,12 +96,12 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Failure rate (success vs failure)",
-      "description": "Per-second rate of processed events, split by result.",
+      "title": "Success vs failure counts",
+      "description": "Cumulative counts of processed events, split by result.",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "h": 8, "w": 16, "x": 8, "y": 10 },
       "fieldConfig": {
-        "defaults": { "unit": "ops" },
+        "defaults": { "unit": "short" },
         "overrides": [
           { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
           { "matcher": { "id": "byName", "options": "failure" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
@@ -111,7 +111,7 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
-          "expr": "sum by (result) (rate(ad_events_processed_total[1m]))",
+          "expr": "sum by (result) (ad_events_processed_total)",
           "legendFormat": "{{result}}",
           "refId": "A"
         }

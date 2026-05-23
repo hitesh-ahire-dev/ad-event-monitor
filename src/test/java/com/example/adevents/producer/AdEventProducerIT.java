@@ -40,7 +40,7 @@ class AdEventProducerIT {
     void publishSampleEvents() throws Exception {
         String bootstrap = System.getProperty("kafka.bootstrap", "localhost:9092");
         String topic = System.getProperty("kafka.topic", "ad-events");
-        int count = Integer.parseInt(System.getProperty("kafka.count", "10"));
+        int count = Integer.parseInt(System.getProperty("kafka.count", "1000"));
 
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrap);
